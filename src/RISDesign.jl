@@ -1,10 +1,12 @@
 """
     RISDesign
 
-`cp_sim.design` (`sim_L_study/cp_sim.py`) for the paper setting `L = 0`, as one straight line of
-named steps, each a small function whose docstring states the formula it evaluates.
+The solver behind the paper's filters, as one straight line of named steps, each a small
+function whose docstring states the formula it evaluates.  `reference/reference_design.py` is
+the literal, unoptimised transcription of the same equations; `test/verify.py` checks the two
+against each other, and everything below called "the reference" is that file.
 
-    include("RISDesign.jl"); using .RISDesign
+    include("src/RISDesign.jl"); using .RISDesign
     G_ej, G_jr, h0 = load_inputs("inputs")
     a = design(G_ej, G_jr, h0, [(19, 0), (79, 1)], 0.1)      # (15359, 28) Matrix{Float64}
 
@@ -24,7 +26,8 @@ of iterations.  Per bin `f` of the rfft grid of length `Nfft`, with `ghat` the s
 
 Same algorithm as the reference -- same operator, same right-hand side, plain CG from a zero
 start, Float64 throughout.  Four things make it fast, each marked FAST (n) in the docstring of
-the function that implements it (the measured times are in the README):
+the function that implements it (the sizes quoted are the paper's, N = 7680, K = 28, 2 emitters
+and 101 receivers):
 
 1. the FFT grid is 30720, not the reference's 30717 (`design`),
 2. `R` is factorised, so no 101 x 28 composite spectra are ever formed (`operator`),
@@ -67,8 +70,8 @@ pcolumns(f, K::Int) = pforeach(cols -> foreach(f, cols), K; npiece=K)
 
 Apply the one-dimensional FFTW `plan` to every column of `input`, one column per task.  Every
 transform here is threaded over columns like this rather than by an FFTW batched plan, because
-the batched complex-to-real plan does not thread at all (see the README).  The plan is built for
-one column and used on all of them, so every column must start in the same FFTW alignment class:
+the batched complex-to-real plan does not thread at all.  The plan is built for one column and
+used on all of them, so every column must start in the same FFTW alignment class:
 that is why `design` requires an even `Nfft`, which puts the columns of the real work arrays a
 multiple of 16 bytes apart.
 """
@@ -80,17 +83,22 @@ function transform_columns!(out::AbstractMatrix, plan, input::AbstractMatrix)
 end
 
 """
-    load_inputs(dir; N=7680, K=28) -> (G_ej, G_jr, h0)
+    load_inputs(dir; N=7680, K=28, n_e=2, n_r=101) -> (G_ej, G_jr, h0)
 
-Read the raw Float64 dumps of `export_inputs.py` in host byte order (files and machine are both
-little-endian): the emitter legs `G_ej[i,k,n]` and receiver legs `G_jr[j,k,n]`, written in C
-order and read as the Julia arrays `[n,k,i]` and `[n,k,j]`, and the design target
-`h0 = irfft(cp_sim.target_spectrum(Nf), 4N-3)`.
+Read the three raw Float64 dumps of `dir` in host byte order (little-endian here), the layout
+`test/make_synthetic.py` also writes:
+
+    G_ej_{n_e}x{K}x{N}_f64le.bin     emitter legs,  C order (n_e, K, N), read as `[n,k,i]`
+    G_jr_{n_r}x{K}x{N}_f64le.bin     receiver legs, C order (n_r, K, N), read as `[n,k,j]`
+    target_h0_len{4N-3}_f64le.bin    the design target `h0`
+
+The defaults are the sizes of the paper's measured set; the numbers in the file names are the
+shapes, so any other set is read by passing its own.
 """
-function load_inputs(dir::AbstractString; N::Int=7680, K::Int=28)
+function load_inputs(dir::AbstractString; N::Int=7680, K::Int=28, n_e::Int=2, n_r::Int=101)
     legs(name) = (p = joinpath(dir, name);
                   read!(p, Array{Float64}(undef, N, K, filesize(p) ÷ (8 * N * K))))
-    return (legs("G_ej_2x$(K)x$(N)_f64le.bin"), legs("G_jr_101x$(K)x$(N)_f64le.bin"),
+    return (legs("G_ej_$(n_e)x$(K)x$(N)_f64le.bin"), legs("G_jr_$(n_r)x$(K)x$(N)_f64le.bin"),
             read!(joinpath(dir, "target_h0_len$(4N-3)_f64le.bin"), Vector{Float64}(undef, 4N - 3)))
 end
 
@@ -198,7 +206,8 @@ because `apply_operator!` sweeps the packed triangle of one frequency at a time.
 
 Storing one triangle also makes `R` exactly Hermitian, where the reference computes both
 triangles independently and is Hermitian only to round-off -- one of the small differences that
-the chaotic tail of the CG recursion later amplifies (see the README).
+the chaotic tail of the CG recursion later amplifies (the note `test/verify.py` prints says how
+much, and why the 100-iteration filters are compared through the physics instead).
 """
 function operator(Ge::Array{ComplexF64,3}, Gt::Array{ComplexF64,3}, S::Matrix{ComplexF64},
                   routes::Vector{Tuple{Int,Int}}, c::Float64, Nfft::Int)
@@ -307,8 +316,9 @@ end
 Plain CG for `U a = b` from `a = 0`, no preconditioner: `alpha = <r,r> / <p,Up>`, `a += alpha*p`,
 `r -= alpha*Up`, `beta = <r_new,r_new> / <r,r>`, `p = r + beta*p`.  The matvec is
 `(U p)_k = irfft(sum_s R_ks * rfft(p_s, Nfft))[1:M]`, the `1/Nfft` of the inverse transform
-already folded into `R`.  Exactly `maxiter` iterations are run: the reference's `reltol = 1e-6`
-stop is never reached here, where the relative residual is still about 0.29 after 100 iterations.
+already folded into `R`.  There is no stopping test: exactly `maxiter` iterations are run, and
+the iteration count is the regularisation -- at the paper's size the relative residual is still
+about 0.29 after the 100 iterations the paper uses.
 """
 function conjugate_gradient(R::Matrix{ComplexF64}, b::Matrix{Float64}, Nfft::Int, maxiter::Int)
     M, K = size(b)
@@ -347,10 +357,10 @@ end
 """
     design(G_ej, G_jr, h0, pairs, c; maxiter=100, Nfft=0) -> a
 
-`cp_sim.design(Problem(G_ej, G_jr), pairs, c, 0, maxiter)`: the `(M, K) = (15359, 28)` filter,
-column `k` being the filter of transceiver `k`.  `pairs` are the 0-based `(receiver, emitter)`
-routes of `cp_sim` and `c` is the weight of every unrouted (emitter, receiver) combination.
-`write(io, a)` reproduces byte for byte the C-order `(28, 15359)` array `cp_sim` works with.
+The `(M, K)` filter -- `(15359, 28)` at the paper's size -- column `k` being the filter of
+transceiver `k`.  `pairs` are the 0-based `(receiver, emitter)` routes and `c` is the weight of
+every unrouted (emitter, receiver) combination.  `write(io, a)` reproduces byte for byte the
+C-order `(K, M)` array the reference returns, which NumPy reads with `.reshape(K, M)`.
 
 FAST (1): `Nfft` defaults to the smallest 5-smooth length `>= conv_len + M - 1 = 30717`, which is
 30720.  Any grid at least that long leaves the matvec and `b` free of wrap-around and so gives
@@ -369,8 +379,7 @@ function design(G_ej::Array{Float64,3}, G_jr::Array{Float64,3}, h0::Vector{Float
     length(h0) == Nmin || error("h0 must have length $Nmin, got $(length(h0))")
     all(0 <= j < size(G_jr, 3) && 0 <= i < size(G_ej, 3) for (j, i) in pairs) ||
         error("pairs must be 0-based (receiver, emitter) indices")
-    allunique(pairs) || error("pairs must be unique: a repeated route would be weighted twice " *
-                              "here but only once by cp_sim.weights")
+    allunique(pairs) || error("pairs must be unique: a repeated route would be weighted twice")
     nfft = Nfft == 0 ? nextprod((2, 3, 5), Nmin) : Nfft     # 0 asks for the default grid, 30720
     nfft >= Nmin && iseven(nfft) ||
         error("Nfft must be even and >= $Nmin, got $nfft")   # even: see transform_columns!
@@ -380,9 +389,9 @@ function design(G_ej::Array{Float64,3}, G_jr::Array{Float64,3}, h0::Vector{Float
     routed = unique(j + 1 for (j, i) in pairs)      # the receivers that carry a routed pair
     routes = [(findfirst(==(j + 1), routed)::Int, i + 1) for (j, i) in pairs]   # 1-based
 
-    Ge = leg_spectra(G_ej, nfft)                    # (nf, K, 2)  emitter legs
-    Gt = leg_spectra(G_jr[:, :, routed], nfft)      # (nf, K, 2)  routed receiver legs
-    Sc = gram_matrix(leg_spectra(G_jr, Nc))         # the 101-receiver sum, on the coarse grid
+    Ge = leg_spectra(G_ej, nfft)                    # (nf, K, n_e)     emitter legs
+    Gt = leg_spectra(G_jr[:, :, routed], nfft)      # (nf, K, routed)  routed receiver legs
+    Sc = gram_matrix(leg_spectra(G_jr, Nc))         # sum over all receivers, on the coarse grid
     S = to_fine_grid(Sc, Nc, nfft, N - 1)
     R = operator(Ge, Gt, S, routes, Float64(c), nfft)
     b = rhs(Ge, Gt, h0, routes, nfft, M)

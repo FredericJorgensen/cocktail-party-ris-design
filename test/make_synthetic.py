@@ -9,9 +9,9 @@ The default ``outdir`` is a directory in the system temporary folder -- the one
 ``test/verify.py`` uses, so that a check leaves nothing inside the repository.  Everything
 is a function of the seed, so two runs produce identical bytes and a directory is reused.
 
-Files written -- raw little-endian float64, C order, no header, named the way
-``sim_L_study/fast_julia/export_inputs.py`` names the measured ones, so that the same
-loader reads either set:
+Files written -- raw little-endian float64, C order, no header, named the way the measured
+inputs are named, the numbers in each name being its shape, so that one loader
+(``RISDesign.load_inputs``, ``test/verify.py``) reads either set:
 
     G_ej_{n_e}x{K}x{N}_f64le.bin     (n_e, K, N)      G_ej[i, k, n], emitter i -> transceiver k
     G_jr_{n_r}x{K}x{N}_f64le.bin     (n_r, K, N)      G_jr[j, k, n], transceiver k -> receiver j

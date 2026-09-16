@@ -38,29 +38,41 @@ Writes `filter.bin`: the designed filter, raw Float64, one column of taps per tr
 julia -t 6 --project=. examples/run_design.jl /path/to/inputs filter.bin
 ```
 
-`/path/to/inputs` holds three raw little-endian Float64 files, C order, no header:
+`/path/to/inputs` holds three raw little-endian Float64 files, C order, no header, the
+numbers in each name being its shape:
 
 ```
-G_ej_2x28x7680_f64le.bin       (emitters, transceivers, samples)      emitter -> transceiver
-G_jr_101x28x7680_f64le.bin     (receivers, transceivers, samples)     transceiver -> receiver
-target_h0_len30717_f64le.bin   (4 * samples - 3,)                     the design target
+G_ej_{emitters}x{transceivers}x{samples}_f64le.bin       emitter -> transceiver
+G_jr_{receivers}x{transceivers}x{samples}_f64le.bin      transceiver -> receiver
+target_h0_len{4 * samples - 3}_f64le.bin                 the design target
 ```
 
-Those are the names the example reads, and `load_inputs(dir; N, K)` takes other sample and
-transceiver counts. `python3 test/make_synthetic.py OUTDIR --samples N --receivers n
---transceivers n` writes a set in the same layout at any size, and `python3 test/verify.py
---inputs DIR` runs the check on any such directory. The routed 0-based
-`(receiver, emitter)` pairs are set in `examples/run_design.jl`.
+The example reads the sizes off those names, so a directory of any size works; the paper's own
+set is `G_ej_2x28x7680_f64le.bin`, `G_jr_101x28x7680_f64le.bin`, `target_h0_len30717_f64le.bin`.
+`python3 test/make_synthetic.py OUTDIR --samples N --receivers n --transceivers n` writes a
+stand-in set in the same layout at any size, and `python3 test/verify.py --inputs DIR` runs the
+check on any such directory. The routed 0-based `(receiver, emitter)` pairs are `(19, 0)` and
+`(79, 1)` on the paper's set and evenly spread otherwise; `default_pairs` in
+`examples/run_design.jl` is where to change them.
 
-Score the result with the paper's isolation metric:
+## Score a filter
+
+The isolation metric the paper quotes, here on a generated set so it runs without data:
+
+```
+python3 test/make_synthetic.py inputs
+julia -t 6 --project=. examples/run_design.jl inputs filter.bin
+```
 
 ```python
 import sys; sys.path.insert(0, "analysis"); import metrics, numpy as np
-G_ej = np.fromfile("inputs/G_ej_2x28x7680_f64le.bin").reshape(2, 28, 7680)
-G_jr = np.fromfile("inputs/G_jr_101x28x7680_f64le.bin").reshape(101, 28, 7680)
-a = np.fromfile("filter.bin").reshape(28, 15359)          # (transceivers, taps)
-print(metrics.isolation(metrics.energies(G_ej, G_jr, a), [(19, 0), (79, 1)]))
+G_ej = np.fromfile("inputs/G_ej_2x12x512_f64le.bin").reshape(2, 12, 512)     # emitter legs
+G_jr = np.fromfile("inputs/G_jr_24x12x512_f64le.bin").reshape(24, 12, 512)   # receiver legs
+a = np.fromfile("filter.bin").reshape(12, 1023)           # (transceivers, taps = 2N-1)
+print(metrics.isolation(metrics.energies(G_ej, G_jr, a), [(8, 0), (16, 1)]))
 ```
+
+With your own data, use the shapes in your file names and the pairs the design routed.
 
 ## Threads
 
