@@ -1,0 +1,16 @@
+# Measurement data and designed filters are never committed: the inputs are raw
+# little-endian Float64 .bin files, and so is every filter the solver writes
+# (filter.bin, real_filter.bin, anything --output points at).
+*.bin
+
+# Julia: Project.toml is committed, Manifest.toml is not -- it would pin one full
+# dependency tree to one Julia version, while the compat bounds in Project.toml are
+# what the repository actually promises.  `Pkg.instantiate()` resolves it locally.
+Manifest.toml
+
+# Python
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store

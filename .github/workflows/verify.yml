@@ -1,0 +1,37 @@
+name: verify
+
+# test/verify.py checks the Julia solver against the NumPy reference implementation on
+# synthetic inputs it generates itself, so this job needs no data and no network beyond
+# the package installs below.
+
+on: [push, pull_request]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.11'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: python -m pip install numpy scipy
+
+      - name: Install Julia dependencies
+        # Use the repository's own environment, and add FFTW.jl if it does not pin one yet.
+        run: |
+          if [ -f Project.toml ]; then
+            julia --project=. -e 'using Pkg; Pkg.instantiate()'
+          else
+            julia --project=. -e 'using Pkg; Pkg.add("FFTW")'
+          fi
+
+      - name: Verify
+        run: python test/verify.py

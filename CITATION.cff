@@ -1,0 +1,64 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: "cocktail-party-ris-design: filter design for spatiotemporal MU-MIMO wave routing"
+type: software
+license: MIT
+authors:
+  - family-names: "Jorgensen"
+    given-names: "Frederic J. N."
+    email: "fjorgen@mit.edu"
+    affiliation: "Department of Mathematics, Massachusetts Institute of Technology"
+  - family-names: "Dorlot"
+    given-names: "Florent"
+    affiliation: "Institut Langevin, ESPCI Paris, PSL University, CNRS, Paris, France"
+  - family-names: "Bourdeloux"
+    given-names: "Constant"
+    orcid: "https://orcid.org/0000-0002-9245-4434"
+    affiliation: "Institut Langevin, ESPCI Paris, PSL University, CNRS, Paris, France"
+  - family-names: "Lemoult"
+    given-names: "Fabrice"
+    affiliation: "Institut Langevin, ESPCI Paris, PSL University, CNRS, Paris, France"
+  - family-names: "Fink"
+    given-names: "Mathias"
+    affiliation: "Institut Langevin, ESPCI Paris, PSL University, CNRS, Paris, France"
+  - family-names: "Johnson"
+    given-names: "Steven G."
+    affiliation: "Department of Mathematics, Massachusetts Institute of Technology"
+  - family-names: "Pestourie"
+    given-names: "Raphaël"
+    affiliation: "School of Computational Science and Engineering, Georgia Institute of Technology"
+
+# TODO before release: add the repository URL once the repository is public.
+# repository-code: "https://github.com/ORG/cocktail-party-ris-design"
+
+preferred-citation:
+  type: article
+  title: "Optimization of Active Reconfigurable Surfaces for Spatiotemporal MU-MIMO Wave Routing in Disordered Media: Applications to the Cocktail-Party Problem"
+  authors:
+    - family-names: "Jorgensen"
+      given-names: "Frederic J. N."
+      email: "fjorgen@mit.edu"
+      affiliation: "Department of Mathematics, Massachusetts Institute of Technology"
+    - family-names: "Dorlot"
+      given-names: "Florent"
+      affiliation: "Institut Langevin, ESPCI Paris, PSL University, CNRS, Paris, France"
+    - family-names: "Bourdeloux"
+      given-names: "Constant"
+      orcid: "https://orcid.org/0000-0002-9245-4434"
+      affiliation: "Institut Langevin, ESPCI Paris, PSL University, CNRS, Paris, France"
+    - family-names: "Lemoult"
+      given-names: "Fabrice"
+      affiliation: "Institut Langevin, ESPCI Paris, PSL University, CNRS, Paris, France"
+    - family-names: "Fink"
+      given-names: "Mathias"
+      affiliation: "Institut Langevin, ESPCI Paris, PSL University, CNRS, Paris, France"
+    - family-names: "Johnson"
+      given-names: "Steven G."
+      affiliation: "Department of Mathematics, Massachusetts Institute of Technology"
+    - family-names: "Pestourie"
+      given-names: "Raphaël"
+      affiliation: "School of Computational Science and Engineering, Georgia Institute of Technology"
+  # TODO before release: fill in and uncomment the year, journal and DOI of publication.
+  # year: 20XX
+  # journal: "TODO"
+  # doi: "10.XXXXX/TODO"
