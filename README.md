@@ -55,6 +55,17 @@ check on any such directory. The routed 0-based `(receiver, emitter)` pairs are 
 `(79, 1)` on the paper's set and evenly spread otherwise; `default_pairs` in
 `examples/run_design.jl` is where to change them.
 
+## Design from a Green's-function file
+
+Reads `G_ej` and `G_jr` from an `.npz`, places the target pulse at a chosen sample, and writes
+the filter as a `(transceivers, taps)` `.npy`. Keep `--delay` below about `--M`.
+
+```
+julia -t 6 --project=. scripts/design_filter.jl --greens Greens.npz --pairs "19,0;79,1" --c 0.1 --maxiter 100 --M 10000 --delay 6000 --normalize spectrum --out filter.npy
+```
+
+The header of `scripts/design_filter.jl` lists every option and its default.
+
 ## Score a filter
 
 The isolation metric the paper quotes, here on a generated set so it runs without data:

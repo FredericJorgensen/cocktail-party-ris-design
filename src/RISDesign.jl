@@ -355,10 +355,13 @@ end
 # ------------------------------------------------------------------------------------- design
 
 """
-    design(G_ej, G_jr, h0, pairs, c; maxiter=100, Nfft=0) -> a
+    design(G_ej, G_jr, h0, pairs, c; maxiter=100, M=0, Nfft=0) -> a
 
 The `(M, K)` filter -- `(15359, 28)` at the paper's size -- column `k` being the filter of
-transceiver `k`.  `pairs` are the 0-based `(receiver, emitter)` routes and `c` is the weight of
+transceiver `k`.  `M` is the number of filter taps; `0` means the composite length `2N - 1`.
+`h0` is the design target in the time domain and must have length `M + 2N - 2`, the shortest
+grid on which neither the matvec nor `b` wraps around; its peak is the arrival time the design
+aims for, so it must lie within reach of the filter (in practice before about sample `M`).  `pairs` are the 0-based `(receiver, emitter)` routes and `c` is the weight of
 every unrouted (emitter, receiver) combination.  `write(io, a)` reproduces byte for byte the
 C-order `(K, M)` array the reference returns, which NumPy reads with `.reshape(K, M)`.
 
@@ -372,10 +375,11 @@ Sets `FFTW.set_num_threads(1)`, which is process-global: transforms here are thr
 columns, and threaded FFTW plans inside those tasks would oversubscribe the machine.
 """
 function design(G_ej::Array{Float64,3}, G_jr::Array{Float64,3}, h0::Vector{Float64},
-                pairs, c::Real; maxiter::Int=100, Nfft::Int=0)
+                pairs, c::Real; maxiter::Int=100, M::Int=0, Nfft::Int=0)
     N = size(G_ej, 1)
-    M = 2N - 1                                      # filter length = composite length conv_len
-    Nmin = M + (2N - 1) - 1                         # 30717: no wrap-around in the matvec or in b
+    M = M == 0 ? 2N - 1 : M                         # filter taps; default = composite length
+    M >= 1 || error("M must be positive, got $M")
+    Nmin = M + (2N - 1) - 1                         # 30717 by default: no wrap-around anywhere
     length(h0) == Nmin || error("h0 must have length $Nmin, got $(length(h0))")
     all(0 <= j < size(G_jr, 3) && 0 <= i < size(G_ej, 3) for (j, i) in pairs) ||
         error("pairs must be 0-based (receiver, emitter) indices")
