@@ -35,3 +35,6 @@ jobs:
 
       - name: Verify
         run: python test/verify.py
+
+      - name: Normal equations against direct least squares
+        run: julia -t 2 --project=. examples/compare_lsqr.jl

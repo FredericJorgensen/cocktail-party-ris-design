@@ -34,6 +34,9 @@ and 101 receivers):
 3. the sum over the 101 receivers runs on a half-length grid (`gram_matrix`, `to_fine_grid`),
 4. `R(f)` is Hermitian, so only its upper triangle is stored and applied (`apply_operator!`).
 
+`design_lsqr` (in `src/lsqr.jl`) computes the same filter without the normal equations, by LSQR
+on the least-squares system itself; `examples/compare_lsqr.jl` compares the two.
+
 The filter does not depend on the number of threads: every sum that is split across tasks is
 split one filter column per task, and the columns are then added up in a fixed order.
 """
@@ -41,7 +44,7 @@ module RISDesign
 
 using FFTW, LinearAlgebra, Base.Threads
 
-export design, load_inputs
+export design, design_lsqr, load_inputs
 
 # ------------------------------------------------------------------------------------ helpers
 
@@ -355,6 +358,29 @@ end
 # ------------------------------------------------------------------------------------- design
 
 """
+    problem_size(G_ej, G_jr, h0, pairs, M, Nfft) -> (N, M, nfft)
+
+Check the arguments of `design` (and `design_lsqr`) and resolve the two sizes whose `0` means
+"default": the filter length `M` (the composite length `2N - 1`) and the FFT grid `nfft` (the
+smallest 5-smooth length `>= M + 2N - 2`, see FAST (1) under `design`).
+"""
+function problem_size(G_ej::Array{Float64,3}, G_jr::Array{Float64,3}, h0::Vector{Float64},
+                      pairs, M::Int, Nfft::Int)
+    N = size(G_ej, 1)
+    M = M == 0 ? 2N - 1 : M                         # filter taps; default = composite length
+    M >= 1 || error("M must be positive, got $M")
+    Nmin = M + (2N - 1) - 1                         # 30717 by default: no wrap-around anywhere
+    length(h0) == Nmin || error("h0 must have length $Nmin, got $(length(h0))")
+    all(0 <= j < size(G_jr, 3) && 0 <= i < size(G_ej, 3) for (j, i) in pairs) ||
+        error("pairs must be 0-based (receiver, emitter) indices")
+    allunique(pairs) || error("pairs must be unique: a repeated route would be weighted twice")
+    nfft = Nfft == 0 ? nextprod((2, 3, 5), Nmin) : Nfft     # 0 asks for the default grid, 30720
+    nfft >= Nmin && iseven(nfft) ||
+        error("Nfft must be even and >= $Nmin, got $nfft")   # even: see transform_columns!
+    return N, M, nfft
+end
+
+"""
     design(G_ej, G_jr, h0, pairs, c; maxiter=100, M=0, Nfft=0) -> a
 
 The `(M, K)` filter -- `(15359, 28)` at the paper's size -- column `k` being the filter of
@@ -376,17 +402,7 @@ columns, and threaded FFTW plans inside those tasks would oversubscribe the mach
 """
 function design(G_ej::Array{Float64,3}, G_jr::Array{Float64,3}, h0::Vector{Float64},
                 pairs, c::Real; maxiter::Int=100, M::Int=0, Nfft::Int=0)
-    N = size(G_ej, 1)
-    M = M == 0 ? 2N - 1 : M                         # filter taps; default = composite length
-    M >= 1 || error("M must be positive, got $M")
-    Nmin = M + (2N - 1) - 1                         # 30717 by default: no wrap-around anywhere
-    length(h0) == Nmin || error("h0 must have length $Nmin, got $(length(h0))")
-    all(0 <= j < size(G_jr, 3) && 0 <= i < size(G_ej, 3) for (j, i) in pairs) ||
-        error("pairs must be 0-based (receiver, emitter) indices")
-    allunique(pairs) || error("pairs must be unique: a repeated route would be weighted twice")
-    nfft = Nfft == 0 ? nextprod((2, 3, 5), Nmin) : Nfft     # 0 asks for the default grid, 30720
-    nfft >= Nmin && iseven(nfft) ||
-        error("Nfft must be even and >= $Nmin, got $nfft")   # even: see transform_columns!
+    N, M, nfft = problem_size(G_ej, G_jr, h0, pairs, M, Nfft)
     Nc = nextprod((2, 3, 5), 2N - 1)                # 15360: holds the Gram's lags |m| <= N-1
     FFTW.set_num_threads(1)
 
@@ -401,5 +417,7 @@ function design(G_ej::Array{Float64,3}, G_jr::Array{Float64,3}, h0::Vector{Float
     b = rhs(Ge, Gt, h0, routes, nfft, M)
     return conjugate_gradient(R, b, nfft, maxiter)
 end
+
+include("lsqr.jl")
 
 end # module

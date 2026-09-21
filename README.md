@@ -85,6 +85,16 @@ print(metrics.isolation(metrics.energies(G_ej, G_jr, a), [(8, 0), (16, 1)]))
 
 With your own data, use the shapes in your file names and the pairs the design routed.
 
+## Compare with a direct least-squares solver
+
+Designs the same filter by the normal equations (`design`) and by LSQR on the least-squares
+system itself (`design_lsqr`), and prints how far the two filters differ, their isolation and
+both run times. Takes an input directory as above, or none for the synthetic set.
+
+```
+julia -t 6 --project=. examples/compare_lsqr.jl [/path/to/inputs]
+```
+
 ## Threads
 
 `julia -t N` sets the solver's thread count; the filter does not depend on it.
