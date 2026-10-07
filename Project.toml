@@ -1,0 +1,8 @@
+[deps]
+FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+NPZ = "15e1cf62-19b3-5cfa-8e77-841668bca605"
+
+[compat]
+FFTW = "1.10"
+NPZ = "0.4.3"
+julia = "1.11"
